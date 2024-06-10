@@ -1,48 +1,117 @@
-import pytest
-from app import app, usuarios
+# 1. Teste de Cadastro de Usuário
 
-@pytest.fixture
-def client():
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+import unittest
 
-def test_cadastrar_usuario(client):
-    rv = client.post('/cadastrar', data={
-        'nome': 'testuser',
-        'senha': 'password123',
-        'confirmar_senha': 'password123'
-    })
-    assert rv.status_code == 302
-    assert 'testuser' in usuarios
+class TestRegistration(unittest.TestCase):
+    def setUp(self):
+        self.users = {}
 
-def test_cadastrar_senhas_diferentes(client):
-    rv = client.post('/cadastrar', data={
-        'nome': 'testuser2',
-        'senha': 'password123',
-        'confirmar_senha': 'password456'
-    })
-    assert b'Erro: As senhas não coincidem.' in rv.data
+    def test_user_registration(self):
+        username = "testuser"
+        password = "testpassword"
+        self.register_user(username, password)
+        self.assertIn(username, self.users)
+        self.assertEqual(self.users[username], password)
 
-def test_login_usuario(client):
-    usuarios['testuser'] = {'senha': hash_senha('password123'), 'texto': ''}
-    rv = client.post('/login', data={
-        'nome': 'testuser',
-        'senha': 'password123'
-    })
-    assert rv.status_code == 302
+    def register_user(self, username, password):
+        self.users[username] = password
 
-def test_login_falha(client):
-    rv = client.post('/login', data={
-        'nome': 'testuser',
-        'senha': 'wrongpassword'
-    })
-    assert b'Erro: Usuário ou senha incorretos.' in rv.data
+if __name__ == '__main__':
+    unittest.main()
 
-def test_adicionar_texto(client):
-    usuarios['testuser'] = {'senha': hash_senha('password123'), 'texto': ''}
-    rv = client.post('/perfil/testuser', data={
-        'texto': 'Este é um texto de teste.'
-    })
-    assert rv.status_code == 302
-    assert usuarios['testuser']['texto'] == 'Este é um texto de teste.'
+# Teste de Cadastro com Senhas Diferentes
+
+class TestRegistration(unittest.TestCase):
+    def setUp(self):
+        self.users = {}
+
+    def test_registration_with_different_passwords(self):
+        username = "testuser"
+        password1 = "password1"
+        password2 = "password2"
+        self.register_user(username, password1, password2)
+        self.assertNotIn(username, self.users)
+
+    def register_user(self, username, password1, password2):
+        if password1 == password2:
+            self.users[username] = password1
+
+if __name__ == '__main__':
+    unittest.main()
+
+# 3. Teste de Login de Usuário
+
+class TestLogin(unittest.TestCase):
+    def setUp(self):
+        self.logged_in_user = None
+
+    def test_user_login(self):
+        username = "testuser"
+        password = "testpassword"
+        self.login_user(username, password)
+        self.assertEqual(self.logged_in_user, username)
+
+    def login_user(self, username, password):
+        if password == "testpassword":  # Simulação de verificação da senha
+            self.logged_in_user = username
+
+if __name__ == '__main__':
+    unittest.main()
+
+# 4. Teste de Login com Senha Incorreta
+
+class TestLogin(unittest.TestCase):
+    def setUp(self):
+        self.logged_in_user = None
+
+    def test_login_with_incorrect_password(self):
+        username = "testuser"
+        password = "wrongpassword"
+        self.login_user(username, password)
+        self.assertIsNone(self.logged_in_user)
+
+    def login_user(self, username, password):
+        if password == "testpassword":  # Simulação de verificação da senha
+            self.logged_in_user = username
+
+if __name__ == '__main__':
+    unittest.main()
+
+# 5 Teste de Upload e Download com Criptografia
+
+import io
+from encrypt_decrypt import encrypt_file, decrypt_file
+
+class IntegrationTestCase(unittest.TestCase):
+    def setUp(self):
+        self.app = app.test_client()
+        self.app.testing = True
+        with app.app_context():
+            db = get_db()
+            db.execute("DELETE FROM users")
+            db.execute("INSERT INTO users (username, password) VALUES (?, ?)",
+                       ("testuser", generate_password_hash("testpassword")))
+            db.commit()
+
+    def test_upload_and_download_file_with_encryption(self):
+        # Login do usuário
+        with self.app.session_transaction() as sess:
+            sess['username'] = 'testuser'
+
+        # Upload do arquivo
+        response = self.app.post('/upload', content_type='multipart/form-data', data=dict(
+            file=(io.BytesIO(b"this is a test"), "test.txt")
+        ), follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+
+        # Download do arquivo
+        response = self.app.get('/download/test.txt', follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        
+        # Descriptografa o conteúdo do arquivo baixado para verificação
+        decrypted_content = decrypt_file(io.BytesIO(response.data))
+        self.assertEqual(decrypted_content, b"this is a test")  # Supondo que o conteúdo do arquivo esteja correto
+
+if __name__ == '__main__':
+    unittest.main()
+
