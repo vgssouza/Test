@@ -19,7 +19,7 @@ class TestRegistration(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-# Teste de Cadastro com Senhas Diferentes
+# 2 Teste de Cadastro com Senhas Diferentes
 
 class TestRegistration(unittest.TestCase):
     def setUp(self):
